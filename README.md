@@ -3,7 +3,6 @@ Tool for running a private telegram bot that can download content from different
 
 ## Installation
 ```
-zsh
 git clone https://github.com/baatochan/TelegramSocialMediaDownloaderBot
 cd TelegramSocialMediaDownloaderBot
 pip install -r requirements.txt
