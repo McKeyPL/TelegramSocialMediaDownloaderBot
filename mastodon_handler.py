@@ -57,26 +57,28 @@ def handle_url(url):
     if not m:
         return {}
     domain, status_id = m.groups()
-    api_url = f"https://{domain}/api/v1/statuses/{status_id}"
-    try:
-        resp = requests.get(api_url, timeout=5)
-        if resp.status_code == 200:
-            data = resp.json()
-            handler_response = {
-                "type": "media" if data.get("media_attachments") else "text",
-                "site": "mastodon",
-                "text": html_to_clean_text(data.get("content", "")),  # changed here
-                "author": data.get("account", {}).get("acct", ""),
-                "url": url,
-                "media": [],
-                "spoiler": False,
-            }
-            for media in data.get("media_attachments", []):
-                if media["type"] == "image":
-                    handler_response["media"].append((media["url"], "photo"))
-                elif media["type"] == "video" or media["type"] == "gifv":
-                    handler_response["media"].append((media["url"], "video"))
-            return handler_response
-    except Exception as e:
-        print(f"Error fetching Mastodon post: {e}")
+    # Try v2 API first, then v1
+    for api_version in ["v2", "v1"]:
+        api_url = f"https://{domain}/api/{api_version}/statuses/{status_id}"
+        try:
+            resp = requests.get(api_url, timeout=5)
+            if resp.status_code == 200:
+                data = resp.json()
+                handler_response = {
+                    "type": "media" if data.get("media_attachments") else "text",
+                    "site": "mastodon",
+                    "text": html_to_clean_text(data.get("content", "")),
+                    "author": data.get("account", {}).get("acct", ""),
+                    "url": url,
+                    "media": [],
+                    "spoiler": False,
+                }
+                for media in data.get("media_attachments", []):
+                    if media["type"] == "image":
+                        handler_response["media"].append((media["url"], "photo"))
+                    elif media["type"] == "video" or media["type"] == "gifv":
+                        handler_response["media"].append((media["url"], "video"))
+                return handler_response
+        except Exception as e:
+            print(f"Error fetching Mastodon post from {api_url}: {e}")
     return {}
