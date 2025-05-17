@@ -658,23 +658,28 @@ def handle_unknown_link(message):
         # Skip if domain is Telegram or your bot
         if "t.me" in domain or "telegram" in domain:
             continue
-        # Check if it's a Mastodon instance
+        # Check if it's a Mastodon instance (try v2, then v1)
         try:
-            resp = requests.get(f"https://{domain}/api/v1/instance", timeout=3)
-            if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("application/json"):
+            mastodon_instance = False
+            for api_version in ["v2", "v1"]:
+                resp = requests.get(f"https://{domain}/api/{api_version}/instance", timeout=3)
+                if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("application/json"):
+                    mastodon_instance = True
+                    break
+            if mastodon_instance:
                 # Pass to mastodon_handler
                 import mastodon_handler
                 handler_response = mastodon_handler.handle_url(url)
                 if "type" in handler_response:
                     send_post_to_tg(message, handler_response)
                 else:
-                    bot.reply_to(message, "Can't handle this Mastodon link.")
+                    bot.reply_to(message, escape_markdown("Can't handle this Mastodon link."))
                 return
         except Exception as e:
             print(f"Error checking Mastodon instance for {domain}: {e}")
 
     # If not Mastodon, fallback
-    bot.reply_to(message, "This site is not supported yet\.")
+    bot.reply_to(message, escape_markdown("This site is not supported yet."))
 
 
 @bot.message_handler(regexp="UseInstafix = True", func=lambda message: message.from_user.id == ALLOWED_USERS[0])

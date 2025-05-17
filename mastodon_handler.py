@@ -39,6 +39,19 @@ def html_to_markdown(text):
     text = re.sub(r'\\\[(.*?)\\\]\(\\\((.*?)\\\)\)', r'[\1](\2)', text)
     return text.strip()
 
+def html_to_clean_text(text):
+    # Replace <br> and </p> with newlines, remove <p>
+    text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'</p\s*>', '\n', text, flags=re.IGNORECASE)
+    text = re.sub(r'<p\s*>', '', text, flags=re.IGNORECASE)
+    # Remove all other HTML tags
+    text = re.sub(r'<[^>]+>', '', text)
+    # Unescape HTML entities
+    text = unescape(text)
+    # Remove extra consecutive newlines
+    text = re.sub(r'\n\s*\n+', '\n\n', text)
+    return text.strip()
+
 def handle_url(url):
     m = re.match(r"https?://([^/]+)/@[^/]+/(\d+)", url)
     if not m:
@@ -52,7 +65,7 @@ def handle_url(url):
             handler_response = {
                 "type": "media" if data.get("media_attachments") else "text",
                 "site": "mastodon",
-                "text": html_to_markdown(data.get("content", "")),
+                "text": html_to_clean_text(data.get("content", "")),  # changed here
                 "author": data.get("account", {}).get("acct", ""),
                 "url": url,
                 "media": [],
