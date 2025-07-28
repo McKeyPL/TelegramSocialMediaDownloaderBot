@@ -7,6 +7,7 @@ import signal
 import sys
 import time
 import traceback
+import requests
 from enum import Enum
 
 import telebot
@@ -23,8 +24,8 @@ import instagram_handler
 import ninegag_handler
 import tiktok_handler
 import twitter_handler
-import requests
 import youtube_handler
+import mastodon_handler
 
 
 class Caption:
@@ -657,45 +658,22 @@ def respond_to_ig_link_with_instafix(original_message, link):
     bot.reply_to(original_message, escape_markdown(fixedLink))
 
 
-@bot.message_handler(regexp="http", func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
-def handle_unknown_link(message):
+@bot.message_handler(content_types=['text'])
+def handle_text_message(message):
     # Skip if already handled by other regexes
     for regex in SITE_REGEXES.values():
         if re.search(regex, message.text):
             return
+    handle_unknown_link(message)
 
-    # Extract domain from URL
-    urls = re.findall(r'https?://[^\s]+', message.text)
-    for url in urls:
-        domain = re.findall(r'https?://([^/]+)/?', url)
-        if not domain:
-            continue
-        domain = domain[0]
-        # Skip if domain is Telegram or your bot
-        if "t.me" in domain or "telegram" in domain:
-            continue
-        # Check if it's a Mastodon instance (try v2, then v1)
-        try:
-            mastodon_instance = False
-            for api_version in ["v2", "v1"]:
-                resp = requests.get(f"https://{domain}/api/{api_version}/instance", timeout=3)
-                if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("application/json"):
-                    mastodon_instance = True
-                    break
-            if mastodon_instance:
-                # Pass to mastodon_handler
-                import mastodon_handler
-                handler_response = mastodon_handler.handle_url(url)
-                if "type" in handler_response:
-                    send_post_to_tg(message, handler_response)
-                else:
-                    bot.reply_to(message, escape_markdown("Can't handle this Mastodon link."))
-                return
-        except Exception as e:
-            print(f"Error checking Mastodon instance for {domain}: {e}")
 
-    # If not Mastodon, fallback
-    bot.reply_to(message, escape_markdown("This site is not supported yet."))
+def handle_unknown_link(message):
+    links = mastodon_handler.extract_links(message.text)
+    for link in links:
+        if mastodon_handler.is_mastodon_link(link):
+            response = mastodon_handler.handle_url(link)
+            if response is not None:
+                send_post_to_tg(message, response)
 
 
 @bot.message_handler(regexp="UseInstafix = True", func=lambda message: message.from_user.id == ALLOWED_USERS[0])
