@@ -43,7 +43,6 @@ def get_video_info(link):
     print(f"[DEBUG] get_video_info called with link: {link}")
     with yt_dlp.YoutubeDL(ydl_options) as ydl:
         info_dict = ydl.extract_info(link, download=False)
-        print(f"[DEBUG] yt-dlp info_dict: {info_dict}")
         return info_dict
 
 

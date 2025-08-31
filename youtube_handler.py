@@ -10,7 +10,6 @@ def handle_url(link):
     print(f"[DEBUG] Cleaned link: {clean_link}")
     try:
         info_dict = yt_dlp_wrapper.get_video_info(clean_link)
-        print(f"[DEBUG] Video info: {info_dict}")
         if not isinstance(info_dict, dict):
             print("[DEBUG] info_dict is not a dict, aborting.")
             return {"error": "Maximum file size, cant download"}
