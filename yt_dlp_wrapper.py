@@ -39,18 +39,33 @@ compression_scenarios = [
 ]
 
 
+def get_video_info(link):
+    print(f"[DEBUG] get_video_info called with link: {link}")
+    with yt_dlp.YoutubeDL(ydl_options) as ydl:
+        info_dict = ydl.extract_info(link, download=False)
+        print(f"[DEBUG] yt-dlp info_dict: {info_dict}")
+        return info_dict
+
+
 def download(link):
+    print(f"[DEBUG] download called with link: {link}")
     with yt_dlp.YoutubeDL(ydl_options) as ydl:
         info_dict = ydl.extract_info(link, download=True)
+        print(f"[DEBUG] yt-dlp info_dict (download): {info_dict}")
         vid_filename = ydl.prepare_filename(info_dict)
+        print(f"[DEBUG] Downloaded filename: {vid_filename}")
         size = os.path.getsize(vid_filename)
+        print(f"[DEBUG] File size: {size}")
         if info_dict['vcodec'].startswith("vp09") or size > 50 * 1000 * 1000:
             is_vertical = info_dict['height'] > info_dict['width']
+            print(f"[DEBUG] Needs compression. is_vertical: {is_vertical}")
             vid_filename = compress_video(vid_filename, size, is_vertical)
+            print(f"[DEBUG] Compressed filename: {vid_filename}")
         return vid_filename, info_dict
 
 
 def compress_video(video_path, original_size, is_vertical=False):
+    print(f"[DEBUG] compress_video called: {video_path}, size: {original_size}, is_vertical: {is_vertical}")
     for scenario in compression_scenarios:
         if original_size < scenario["size_threshold"]:
             compressed_video_path = video_path.replace(
@@ -64,17 +79,21 @@ def compress_video(video_path, original_size, is_vertical=False):
                     run_compression_with_resizing(
                         video_path, compressed_video_path, scale)
             compressed_size = os.path.getsize(compressed_video_path)
+            print(f"[DEBUG] Compressed file size: {compressed_size}")
             if compressed_size < 50 * 1000 * 1000:
                 return compressed_video_path
 
     if original_size < 50 * 1000 * 1000:
         # fallback to original video if compression fails
+        print(f"[DEBUG] Compression failed, using original file.")
         return video_path
 
+    print(f"[DEBUG] Video is too large to compress")
     raise Exception("Video is too large to compress")
 
 
 def run_compression(video_path, output_file):
+    print(f"[DEBUG] run_compression: {video_path} -> {output_file}")
     ffmpeg\
         .input(video_path)\
         .output(output_file,
@@ -88,6 +107,7 @@ def run_compression(video_path, output_file):
 
 
 def run_compression_with_resizing(video_path, output_file, scale):
+    print(f"[DEBUG] run_compression_with_resizing: {video_path} -> {output_file}, scale: {scale}")
     ffmpeg\
         .input(video_path)\
         .output(output_file,
