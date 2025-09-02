@@ -1,3 +1,10 @@
+NINEGAG_SUPPORT_ENABLED = config['9gag'].getboolean('enabled', True) if 'enabled' in config['9gag'] else True
+TWITTER_SUPPORT_ENABLED = config['twitter'].getboolean('enabled', True) if 'enabled' in config['twitter'] else True
+INSTAGRAM_SUPPORT_ENABLED = config['instagram'].getboolean('enabled', True) if 'enabled' in config['instagram'] else True
+BOORU_SUPPORT_ENABLED = config['booru'].getboolean('enabled', True) if 'enabled' in config['booru'] else True
+DEMOTY_SUPPORT_ENABLED = config['demoty'].getboolean('enabled', True) if 'enabled' in config['demoty'] else True
+TIKTOK_SUPPORT_ENABLED = config['tiktok'].getboolean('enabled', True) if 'enabled' in config['tiktok'] else True
+MASTODON_SUPPORT_ENABLED = config['mastodon'].getboolean('enabled', True) if 'enabled' in config['mastodon'] else True
 #!/usr/bin/env python3
 import configparser
 import json
@@ -124,13 +131,13 @@ def send_welcome(message):
                      parse_mode=None)
 
 
-@bot.message_handler(regexp=SITE_REGEXES['9gag'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
-@bot.message_handler(regexp=SITE_REGEXES['twitter'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
-@bot.message_handler(regexp=SITE_REGEXES['instagram'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
-@bot.message_handler(regexp=SITE_REGEXES['booru'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
-@bot.message_handler(regexp=SITE_REGEXES['demoty'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
-@bot.message_handler(regexp=SITE_REGEXES['tiktok'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
-@bot.message_handler(regexp=SITE_REGEXES['youtube'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
+@bot.message_handler(regexp=SITE_REGEXES['9gag'], func=lambda message: NINEGAG_SUPPORT_ENABLED and (message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS))
+@bot.message_handler(regexp=SITE_REGEXES['twitter'], func=lambda message: TWITTER_SUPPORT_ENABLED and (message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS))
+@bot.message_handler(regexp=SITE_REGEXES['instagram'], func=lambda message: INSTAGRAM_SUPPORT_ENABLED and (message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS))
+@bot.message_handler(regexp=SITE_REGEXES['booru'], func=lambda message: BOORU_SUPPORT_ENABLED and (message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS))
+@bot.message_handler(regexp=SITE_REGEXES['demoty'], func=lambda message: DEMOTY_SUPPORT_ENABLED and (message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS))
+@bot.message_handler(regexp=SITE_REGEXES['tiktok'], func=lambda message: TIKTOK_SUPPORT_ENABLED and (message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS))
+@bot.message_handler(regexp=SITE_REGEXES['youtube'], func=lambda message: YOUTUBE_SUPPORT_ENABLED and (message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS))
 def handle_supported_site(message):
     if message.forward_origin and message.forward_origin.type == "user" and message.forward_origin.sender_user.id == BOT_ID:
         return
@@ -699,6 +706,8 @@ def handle_text_message(message):
 
 
 def handle_unknown_link(message):
+    if not MASTODON_SUPPORT_ENABLED:
+        return
     links = mastodon_handler.extract_links(message.text)
     for link in links:
         if mastodon_handler.is_mastodon_link(link):
