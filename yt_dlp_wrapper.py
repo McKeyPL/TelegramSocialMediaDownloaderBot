@@ -50,7 +50,6 @@ def download(link):
     print(f"[DEBUG] download called with link: {link}")
     with yt_dlp.YoutubeDL(ydl_options) as ydl:
         info_dict = ydl.extract_info(link, download=True)
-        print(f"[DEBUG] yt-dlp info_dict (download): {info_dict}")
         vid_filename = ydl.prepare_filename(info_dict)
         print(f"[DEBUG] Downloaded filename: {vid_filename}")
         size = os.path.getsize(vid_filename)

@@ -23,3 +23,7 @@ use_selenium = True
 [youtube]
 # yt-dlp espesially with ffmpeg reencoding is very resource intensive so there is an option to disable yt support at all
 enabled = True
+
+[streamable]
+# Enable or disable Streamable support (True/False)
+enabled = True

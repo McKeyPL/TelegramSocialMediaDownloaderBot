@@ -16,6 +16,7 @@ from telebot.formatting import escape_markdown
 from telebot.types import (InputMediaPhoto, InputMediaVideo,
                            LinkPreviewOptions, ReplyParameters)
 from tendo import singleton
+import streamable_handler
 
 import booru_handler
 import demoty_handler
@@ -26,6 +27,7 @@ import tiktok_handler
 import twitter_handler
 import youtube_handler
 import mastodon_handler
+import streamable_handler
 
 
 class Caption:
@@ -54,6 +56,7 @@ ALLOWED_CHATS = json.loads(config['config']['allowed_chats'])
 
 SELENIUM_FOR_9GAG = config['9gag'].getboolean('use_selenium')
 YOUTUBE_SUPPORT_ENABLED = config['youtube'].getboolean('enabled')
+STREAMABLE_SUPPORT_ENABLED = config['streamable'].getboolean('enabled')
 
 bot = telebot.TeleBot(config['config']['token'])
 BOT_ID = bot.get_me().id
@@ -61,6 +64,33 @@ PARSE_MODE = "MarkdownV2"
 bot.parse_mode = PARSE_MODE
 
 ERROR_MESSAGE = escape_markdown("Can't download this post. Try again later.")
+
+# Add Streamable regex to SITE_REGEXES if not present
+if 'SITE_REGEXES' in globals():
+    SITE_REGEXES['streamable'] = r"((http(s)?://)|^| )(www\.)?streamable\.com/.+"
+else:
+    SITE_REGEXES = {
+        "streamable": r"((http(s)?://)|^| )(www\.)?streamable\.com/.+"
+    }
+
+# Streamable message handler
+@bot.message_handler(regexp=SITE_REGEXES['streamable'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
+def handle_streamable_site(message):
+    if not STREAMABLE_SUPPORT_ENABLED:
+        print("Streamable support disabled in config.")
+        bot.reply_to(message, escape_markdown("Streamable support is disabled."))
+        return
+
+    msgContent = message.text.split()
+    r = re.compile(SITE_REGEXES['streamable'])
+    streamableLinks = list(filter(r.match, msgContent))
+    for link in streamableLinks:
+        handler_response = streamable_handler.handle_url(link)
+        if "type" in handler_response:
+            send_post_to_tg(message, handler_response)
+        else:
+            print("Can't handle streamable link: " + str(link))
+            bot.reply_to(message, escape_markdown("Can't download this Streamable post. Try again later."))
 
 SITE_REGEXES = {
     "9gag": "((http(s)?://)|^| )(www.)?9gag.com/.+",
@@ -70,6 +100,7 @@ SITE_REGEXES = {
     "demoty": "((http(s)?://)|^| )(www.|m.)?demotywatory.pl/.+",
     "tiktok": "((http(s)?://)|^| )(www.|vm.|m.)?tiktok.com/.+",
     "youtube": "((http(s)?://)|^| )(www.|m.)?(youtube(-nocookie)?.com|youtu.be)/.+",
+    "streamable": "((http(s)?://)|^| )(www.)?streamable.com/.+",
 }
 
 instagram_client = Client()
