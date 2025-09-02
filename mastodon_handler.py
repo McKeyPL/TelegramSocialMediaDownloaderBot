@@ -91,48 +91,96 @@ def is_mastodon_link(url):
     return False
 
 def handle_url(url):
-    # Standard Mastodon status
+    print(f"[DEBUG] handle_url called with: {url}")
+    # Debbugs links (unsupported)
+    if re.match(r"https?://debbugs[\w\.-]+", url):
+        print(f"[DEBUG] Debbugs link detected: {url}")
+        return {"type": "error", "site": "debbugs", "url": url, "error": "Can't download debbugs links."}
+    # Standard Mastodon status (thread handler)
     m = re.match(r"https?://([^/]+)/@[^/]+/(\d+)", url)
     if m:
         domain, status_id = m.groups()
+        print(f"[DEBUG] Mastodon status detected: domain={domain}, status_id={status_id}")
+        thread = []
+        current_id = status_id
+        used_api_version = None
+        # Try to find working API version first
         for api_version in ["v2", "v1"]:
-            api_url = f"https://{domain}/api/{api_version}/statuses/{status_id}"
+            api_url = f"https://{domain}/api/{api_version}/statuses/{current_id}"
+            print(f"[DEBUG] Trying API URL: {api_url}")
             try:
                 resp = requests.get(api_url, timeout=5)
+                print(f"[DEBUG] Response status: {resp.status_code}")
                 if resp.status_code == 200:
-                    data = resp.json()
-                    media_attachments = []
-                    for media in data.get("media_attachments", []):
-                        if media["type"] == "image":
-                            media_attachments.append((media["url"], "photo"))
-                        elif media["type"] in ["video", "gifv"]:
-                            media_attachments.append((media["url"], "video"))
-                    handler_response = {
-                        "type": "media" if media_attachments else "text",
-                        "site": "mastodon",
-                        "text": html_to_clean_text(data.get("content", "")),
-                        "author": data.get("account", {}).get("acct", ""),
-                        "url": url,
-                        "media": media_attachments,
-                        "spoiler": False,
-                    }
-                    return handler_response
+                    used_api_version = api_version
+                    break
             except Exception as e:
-                pass
-        return None
+                print(f"[DEBUG] Exception: {e}")
+                continue
+        if not used_api_version:
+            print(f"[DEBUG] Could not download Mastodon status: {url}")
+            return {"type": "error", "site": "mastodon", "url": url, "error": "Can't download"}
+        # Download thread
+        while current_id:
+            api_url = f"https://{domain}/api/{used_api_version}/statuses/{current_id}"
+            print(f"[DEBUG] Downloading thread status: {api_url}")
+            try:
+                resp = requests.get(api_url, timeout=5)
+                print(f"[DEBUG] Response status: {resp.status_code}")
+                if resp.status_code != 200:
+                    print(f"[DEBUG] Failed to download status {current_id}")
+                    break
+                data = resp.json()
+                print(f"[DEBUG] Data received: {data}")
+                media_attachments = []
+                for media in data.get("media_attachments", []):
+                    print(f"[DEBUG] Media: {media}")
+                    if media["type"] == "image":
+                        media_attachments.append((media["url"], "photo"))
+                    elif media["type"] in ["video", "gifv"]:
+                        media_attachments.append((media["url"], "video"))
+                handler_response = {
+                    "type": "media" if media_attachments else "text",
+                    "site": "mastodon",
+                    "text": html_to_clean_text(data.get("content", "")),
+                    "author": data.get("account", {}).get("acct", ""),
+                    "url": f"https://{domain}/@{data.get('account', {}).get('acct', '')}/{current_id}",
+                    "media": media_attachments,
+                    "spoiler": False,
+                }
+                print(f"[DEBUG] Handler response: {handler_response}")
+                thread.insert(0, handler_response)  # Insert at start for chronological order
+                current_id = data.get("in_reply_to_id")
+            except Exception as e:
+                print(f"[DEBUG] Exception: {e}")
+                break
+        if len(thread) > 1:
+            print(f"[DEBUG] Returning thread with {len(thread)} statuses")
+            return {"type": "thread", "site": "mastodon", "thread": thread, "url": url}
+        elif thread:
+            print(f"[DEBUG] Returning single status")
+            return thread[0]
+        else:
+            print(f"[DEBUG] No statuses downloaded")
+            return {"type": "error", "site": "mastodon", "url": url, "error": "Can't download"}
     # Sharkey note (Misskey/Firefish compatible)
     m = re.match(r"https?://([^/]+)/notes/([a-zA-Z0-9]+)", url)
     if m:
         domain, note_id = m.groups()
         api_url = f"https://{domain}/api/notes/show"
+        print(f"[DEBUG] Sharkey note detected: domain={domain}, note_id={note_id}")
+        print(f"[DEBUG] Trying API URL: {api_url}")
         try:
             resp = requests.post(api_url, headers={"Content-Type": "application/json"}, json={"noteId": note_id}, timeout=5)
+            print(f"[DEBUG] Response status: {resp.status_code}")
             if resp.status_code == 200:
                 data = resp.json()
+                print(f"[DEBUG] Data received: {data}")
                 text = data.get("text", "")
                 author = data.get("user", {}).get("username", "")
                 media_attachments = []
                 for file in data.get("files", []):
+                    print(f"[DEBUG] File: {file}")
                     mime = file.get("type", "")
                     url_ = file.get("url", "")
                     if mime.startswith("image/"):
@@ -149,8 +197,11 @@ def handle_url(url):
                     "media": media_attachments,
                     "spoiler": spoiler,
                 }
+                print(f"[DEBUG] Handler response: {handler_response}")
                 return handler_response
         except Exception as e:
-            pass
-        return None
-    return None
+            print(f"[DEBUG] Exception: {e}")
+        print(f"[DEBUG] Could not download Sharkey note: {url}")
+        return {"type": "error", "site": "sharkey", "url": url, "error": "Can't download"}
+    print(f"[DEBUG] URL not recognized or unsupported: {url}")
+    return {"type": "error", "site": "unknown", "url": url, "error": "Can't download"}

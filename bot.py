@@ -704,7 +704,11 @@ def handle_unknown_link(message):
         if mastodon_handler.is_mastodon_link(link):
             response = mastodon_handler.handle_url(link)
             if response is not None:
-                send_post_to_tg(message, response)
+                if isinstance(response, dict) and response.get('type') == 'thread' and 'thread' in response:
+                    for status in response['thread']:
+                        send_post_to_tg(message, status)
+                else:
+                    send_post_to_tg(message, response)
 
 
 @bot.message_handler(regexp="UseInstafix = True", func=lambda message: message.from_user.id == ALLOWED_USERS[0])
