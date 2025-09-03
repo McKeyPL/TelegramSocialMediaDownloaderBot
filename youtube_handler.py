@@ -60,10 +60,12 @@ def prepare_metadata(output_filename, info_dict):
     print(f"[DEBUG] Preparing metadata for file: {output_filename}")
     return_data = {}
     return_data['site'] = "youtube"
-    return_data['id'] = info_dict['id']
-    return_data['url'] = info_dict['original_url']
-    return_data['author'] = info_dict['uploader'] + " (" + info_dict['uploader_id'] + ")"
-    return_data['text'] = info_dict['fulltitle']
+    return_data['id'] = info_dict.get('id', '')
+    return_data['url'] = info_dict.get('original_url', '')
+    uploader = info_dict.get('uploader') or "Unknown"
+    uploader_id = info_dict.get('uploader_id') or "Unknown"
+    return_data['author'] = f"{uploader} (ID: {uploader_id})"
+    return_data['text'] = info_dict.get('fulltitle', '')
     return_data['spoiler'] = False
     return_data['media'] = [[output_filename, "video_file"]]
     return_data['type'] = "media"
