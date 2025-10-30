@@ -28,6 +28,7 @@ import twitter_handler
 import youtube_handler
 import mastodon_handler
 import streamable_handler
+import bluesky_handler
 
 
 class Caption:
@@ -51,8 +52,29 @@ else:
     print("No config file. Create config file and run the script again.")
     exit(1)
 
-ALLOWED_USERS = json.loads(config['config']['allowed_users'])
+# Parse allowed users: support a special value "ALL" to allow any Telegram user
+allowed_users_cfg = config['config']['allowed_users'].strip()
+if allowed_users_cfg.upper() == "ALL":
+    ALLOW_ALL_USERS = True
+    ALLOWED_USERS = []  # kept for compatibility, but ignored when ALLOW_ALL_USERS=True
+else:
+    ALLOW_ALL_USERS = False
+    ALLOWED_USERS = json.loads(allowed_users_cfg)
+
+# Chats still parsed as JSON list
 ALLOWED_CHATS = json.loads(config['config']['allowed_chats'])
+
+# Owner (first configured allowed user) — used by owner-only handlers
+OWNER_ID = ALLOWED_USERS[0] if (not ALLOW_ALL_USERS and len(ALLOWED_USERS) > 0) else None
+
+def is_allowed_user(message):
+    """Return True when message author or chat is allowed (or global allow enabled)."""
+    if ALLOW_ALL_USERS:
+        return True
+    try:
+        return (message.from_user.id in ALLOWED_USERS) or (message.chat.id in ALLOWED_CHATS)
+    except Exception:
+        return False
 
 SELENIUM_FOR_9GAG = config['9gag'].getboolean('use_selenium')
 YOUTUBE_SUPPORT_ENABLED = config['youtube'].getboolean('enabled')
@@ -74,7 +96,7 @@ else:
     }
 
 # Streamable message handler
-@bot.message_handler(regexp=SITE_REGEXES['streamable'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
+@bot.message_handler(regexp=SITE_REGEXES['streamable'], func=is_allowed_user)
 def handle_streamable_site(message):
     if not STREAMABLE_SUPPORT_ENABLED:
         print("Streamable support disabled in config.")
@@ -101,6 +123,7 @@ SITE_REGEXES = {
     "tiktok": "((http(s)?://)|^| )(www.|vm.|m.)?tiktok.com/.+",
     "youtube": "((http(s)?://)|^| )(www.|m.)?(youtube(-nocookie)?.com|youtu.be)/.+",
     "streamable": "((http(s)?://)|^| )(www.)?streamable.com/.+",
+    "bluesky": "((http(s)?://)|^| )(www.)?bsky.app/.+",
 }
 
 instagram_client = Client()
@@ -110,7 +133,7 @@ USE_INSTAFIX = True
 
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
-    if message.from_user.id in ALLOWED_USERS:
+    if is_allowed_user(message):
         welcome_message_text = escape_markdown("Hi, I can download media from different social media and send" +
                                                " them to you here on telegram. Send me a link and I'll take care of the rest.")
         bot.reply_to(message=message, text=welcome_message_text)
@@ -124,13 +147,14 @@ def send_welcome(message):
                      parse_mode=None)
 
 
-@bot.message_handler(regexp=SITE_REGEXES['9gag'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
-@bot.message_handler(regexp=SITE_REGEXES['twitter'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
-@bot.message_handler(regexp=SITE_REGEXES['instagram'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
-@bot.message_handler(regexp=SITE_REGEXES['booru'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
-@bot.message_handler(regexp=SITE_REGEXES['demoty'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
-@bot.message_handler(regexp=SITE_REGEXES['tiktok'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
-@bot.message_handler(regexp=SITE_REGEXES['youtube'], func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
+@bot.message_handler(regexp=SITE_REGEXES['9gag'], func=is_allowed_user)
+@bot.message_handler(regexp=SITE_REGEXES['twitter'], func=is_allowed_user)
+@bot.message_handler(regexp=SITE_REGEXES['instagram'], func=is_allowed_user)
+@bot.message_handler(regexp=SITE_REGEXES['booru'], func=is_allowed_user)
+@bot.message_handler(regexp=SITE_REGEXES['demoty'], func=is_allowed_user)
+@bot.message_handler(regexp=SITE_REGEXES['tiktok'], func=is_allowed_user)
+@bot.message_handler(regexp=SITE_REGEXES['youtube'], func=is_allowed_user)
+@bot.message_handler(regexp=SITE_REGEXES['bluesky'], func=is_allowed_user)
 def handle_supported_site(message):
     if message.forward_origin and message.forward_origin.type == "user" and message.forward_origin.sender_user.id == BOT_ID:
         return
@@ -273,8 +297,30 @@ def handle_supported_site(message):
             else:
                 print("Can't handle youtube link: " + str(link))
 
+    r = re.compile(SITE_REGEXES['bluesky'])
+    blueskyLinks = list(filter(r.match, msgContent))
+    for link in blueskyLinks:
+        link = link.split("?")  # we don't need parameters after ?
+        try:
+            handler_response = bluesky_handler.handle_url(link[0])
+            if "type" in handler_response:
+                if overrideSpoiler != OverrideSpoiler.NO_OVERRIDE:
+                    handler_response['spoiler'] = overrideSpoiler == OverrideSpoiler.SPOILER
+                if removeDescription:
+                    handler_response['text'] = ""
+                send_post_to_tg(message, handler_response)
+            else:
+                print("Can't handle Bluesky link: ")
+                print(*link, sep="?")
+        except Exception as e:
+            print(time.strftime("%d.%m.%Y %H:%M:%S", time.localtime()))
+            traceback.print_exception(type(e), e, e.__traceback__)
+            print()
+            print("Can't handle Bluesky link: ")
+            print(*link, sep="?")
 
-@bot.message_handler(regexp="^\s*(>>|»)(\!|\?)?\d+\s*", func=lambda message: message.from_user.id in ALLOWED_USERS or message.chat.id in ALLOWED_CHATS)
+
+@bot.message_handler(regexp="^\s*(>>|»)(\!|\?)?\d+\s*", func=is_allowed_user)
 def handle_derpibooru_magic_character_request(message):
     msg_text = message.text.strip()
     msg_text = msg_text.lstrip(">>").lstrip("»")
@@ -711,21 +757,21 @@ def handle_unknown_link(message):
                     send_post_to_tg(message, response)
 
 
-@bot.message_handler(regexp="UseInstafix = True", func=lambda message: message.from_user.id == ALLOWED_USERS[0])
+@bot.message_handler(regexp="UseInstafix = True", func=lambda message: OWNER_ID is not None and message.from_user.id == OWNER_ID)
 def set_useinstafix_true(message):
     global USE_INSTAFIX
     USE_INSTAFIX = True
     bot.reply_to(message, "UseInstafix set to True\.")
 
 
-@bot.message_handler(regexp="UseInstafix = False", func=lambda message: message.from_user.id == ALLOWED_USERS[0])
+@bot.message_handler(regexp="UseInstafix = False", func=lambda message: OWNER_ID is not None and message.from_user.id == OWNER_ID)
 def set_useinstafix_true(message):
     global USE_INSTAFIX
     USE_INSTAFIX = False
     bot.reply_to(message, "UseInstafix set to False\.")
 
 
-@bot.message_handler(regexp="test", func=lambda message: message.from_user.id in ALLOWED_USERS)
+@bot.message_handler(regexp="test", func=is_allowed_user)
 def test(message):
     pass
 

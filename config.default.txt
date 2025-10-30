@@ -2,7 +2,9 @@
 # telegram bot token created via @BotFather
 token = <your-tg-bot-token>
 # telegram user id for every user that is allowed to use the bot
-allowed_users = [420, 2137, 621]
+# Use the special value ALL to allow the bot to be used by any Telegram user
+allowed_users = ALL
+# allowed_users = [420, 2137, 621]
 # telegram group id for every group that is allowed to use the bot (all users)
 allowed_chats = [-10002137, -100042069]
 # your tg username, used in the msg to unauthorized users
@@ -27,3 +29,11 @@ enabled = True
 [streamable]
 # Enable or disable Streamable support (True/False)
 enabled = True
+
+[bluesky]
+# Credentials for Bluesky API (bsky.app)
+# Generate an App Password in your Bluesky settings under "App Passwords"
+# change enabled to true after setting up credentials
+enabled = False
+username = username.bsky.social
+app_password = P@22w0rD!

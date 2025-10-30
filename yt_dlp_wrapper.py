@@ -46,9 +46,20 @@ def get_video_info(link):
         return info_dict
 
 
-def download(link):
+def download(link, output_template=None, thumbnail_url=None):
     print(f"[DEBUG] download called with link: {link}")
-    with yt_dlp.YoutubeDL(ydl_options) as ydl:
+    options = ydl_options.copy()
+    if output_template:
+        options["outtmpl"] = os.path.join("temp/yt-dlp", output_template)
+    if thumbnail_url:
+        options["writethumbnail"] = True
+        # Override yt-dlp's thumbnail with our provided one
+        options["postprocessors"] = [{
+            'key': 'FFmpegThumbnailsConvertor',
+            'format': 'jpg',
+        }]
+    
+    with yt_dlp.YoutubeDL(options) as ydl:
         info_dict = ydl.extract_info(link, download=True)
         vid_filename = ydl.prepare_filename(info_dict)
         print(f"[DEBUG] Downloaded filename: {vid_filename}")
