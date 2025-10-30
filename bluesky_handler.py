@@ -71,10 +71,10 @@ def handle_url(link):
             }
         )
 
-        try:
-            print("[DEBUG] Bluesky API thread response:", json.dumps(thread_response.json(), indent=2))
-        except Exception:
-            print("[DEBUG] Bluesky API thread response: (no json)")
+       # try:
+       #     print("[DEBUG] Bluesky API thread response:", json.dumps(thread_response.json(), indent=2))
+       # except Exception:
+       #     print("[DEBUG] Bluesky API thread response: (no json)")
 
         if thread_response.status_code != 200:
             print(f"Failed to fetch post data: {thread_response.status_code}")
