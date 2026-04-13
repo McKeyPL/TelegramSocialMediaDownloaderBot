@@ -115,15 +115,15 @@ def handle_streamable_site(message):
             bot.reply_to(message, escape_markdown("Can't download this Streamable post. Try again later."))
 
 SITE_REGEXES = {
-    "9gag": "((http(s)?://)|^| )(www.)?9gag.com/.+",
-    "twitter": "((http(s)?://)|^| )(www.)?((fixup|fixv)?x|(fx|vx)?twitter).com/.+",
-    "instagram": "((http(s)?://)|^| )(www.)?instagram.com/.+",
-    "booru": "((http(s)?://)|^| )(www.)?[a-zA-Z]*booru.org/.+",
-    "demoty": "((http(s)?://)|^| )(www.|m.)?demotywatory.pl/.+",
-    "tiktok": "((http(s)?://)|^| )(www.|vm.|m.)?tiktok.com/.+",
-    "youtube": "((http(s)?://)|^| )(www.|m.)?(youtube(-nocookie)?.com|youtu.be)/.+",
-    "streamable": "((http(s)?://)|^| )(www.)?streamable.com/.+",
-    "bluesky": "((http(s)?://)|^| )(www.)?bsky.app/.+",
+    "9gag": r"((http(s)?://)|^| )(www\.)?9gag\.com/.+",
+    "twitter": r"((http(s)?://)|^| )(www\.)?((fixup|fixv)?x|(fx|vx)?twitter)\.com/.+",
+    "instagram": r"((http(s)?://)|^| )(www\.)?instagram\.com/.+",
+    "booru": r"((http(s)?://)|^| )(www\.)?[a-zA-Z]*booru\.org/.+",
+    "demoty": r"((http(s)?://)|^| )(www\.|m\.)?demotywatory\.pl/.+",
+    "tiktok": r"((http(s)?://)|^| )(www\.|vm\.|m\.)?tiktok\.com/.+",
+    "youtube": r"((http(s)?://)|^| )(www\.|m\.)?(youtube(-nocookie)?\.com|youtu\.be)/.+",
+    "streamable": r"((http(s)?://)|^| )(www\.)?streamable\.com/.+",
+    "bluesky": r"((http(s)?://)|^| )(www\.)?bsky\.app/.+",
 }
 
 instagram_client = Client()
