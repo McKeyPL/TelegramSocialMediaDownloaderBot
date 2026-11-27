@@ -1,0 +1,13 @@
+services:
+  telegram-downloader:
+    image: "${BOT_IMAGE:-ghcr.io/mckeypl/telegramsocialmediadownloaderbot:v1.0.0-linux-x64}"
+    pull_policy: missing
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 75s
+    volumes:
+      - type: bind
+        source: "${BOT_DATA_DIR:-/srv/telegram-bot}"
+        target: /data
+        bind:
+          create_host_path: false

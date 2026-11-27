@@ -14,6 +14,7 @@ jobs:
   package:
     permissions:
       contents: write
+      packages: write
     name: ${{ github.ref_type == 'tag' && 'Test and build' || 'Test' }} ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 150
@@ -216,9 +217,34 @@ jobs:
         run: |
           install -D -m 0755 native-bundle/bin/telegram-bot-api bin/telegram-bot-api
           image="telegram-social-media-downloader-bot:$APP_COMMIT-$PACKAGE_TARGET"
-          docker build --tag "$image" --label "org.opencontainers.image.revision=$APP_COMMIT" .
+          docker build --tag "$image" \
+            --label "org.opencontainers.image.revision=$APP_COMMIT" \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" .
           docker run --rm --entrypoint /app/bin/telegram-bot-api "$image" --version
           docker run --rm "$image" --help
+      - name: Publish Docker image to GHCR
+        if: github.ref_type == 'tag' && runner.os == 'Linux'
+        shell: bash
+        env:
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          tag="$GITHUB_REF_NAME-$PACKAGE_TARGET"
+          if [[ ! "$tag" =~ ^v[A-Za-z0-9_.-]{1,127}$ ]]; then
+            echo "Version tag cannot be used as a Docker tag: $tag" >&2
+            exit 1
+          fi
+          image="telegram-social-media-downloader-bot:$APP_COMMIT-$PACKAGE_TARGET"
+          published="ghcr.io/${GITHUB_REPOSITORY,,}:$tag"
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io >/dev/null' EXIT
+          docker tag "$image" "$published"
+          docker push "$published"
+          printf '\nDocker image: `%s`\n' "$published" >> "$GITHUB_STEP_SUMMARY"
+      - name: Save Docker image archive
+        if: github.ref_type == 'tag' && runner.os == 'Linux'
+        shell: bash
+        run: |
+          image="telegram-social-media-downloader-bot:$APP_COMMIT-$PACKAGE_TARGET"
           archive="telegram-social-media-downloader-bot-$APP_COMMIT-docker-$PACKAGE_TARGET.tar.gz"
           docker save "$image" | gzip -c > "dist/$archive"
           (cd dist && sha256sum "$archive" > "$archive.sha256")

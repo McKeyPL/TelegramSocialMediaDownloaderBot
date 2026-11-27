@@ -33,6 +33,7 @@ OPTIONAL_FILES = {
     "README.md",
     "ROADMAP.md",
     "Dockerfile",
+    "compose.yaml",
     ".dockerignore",
     "logs/.gitkeep",
     "scripts/deploy_windows.py",

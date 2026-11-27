@@ -29,7 +29,9 @@ Local mode also needs `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` from your Telegr
 
 ## Run with Docker
 
-Download the matching Linux x64 or ARM64 Docker artifact from the version's GitHub Actions run. Extract it, verify the included SHA-256, then import the image. Use the image name and tag printed by `docker load`.
+A version-tag build publishes separate images to GitHub Container Registry. Tag `v1.0.0` produces `ghcr.io/mckeypl/telegramsocialmediadownloaderbot:v1.0.0-linux-x64` and `ghcr.io/mckeypl/telegramsocialmediadownloaderbot:v1.0.0-linux-arm64`. After the first publish, set the package visibility to **Public** in GitHub Packages if the image should pull without signing in. For Portainer on Docker Standalone, upload [compose.yaml](compose.yaml). Set `BOT_IMAGE` to override the image tag or architecture and `BOT_DATA_DIR` to the path of the host directory with `config.txt`. The default host directory is `/srv/telegram-bot`.
+
+For an offline import, download the matching Docker artifact from the version's GitHub Actions run. Extract it, verify the included SHA-256, then import the image. Use the image name and tag printed by `docker load`.
 
 ```powershell
 docker load -i .\image-linux-x64.tar.gz
