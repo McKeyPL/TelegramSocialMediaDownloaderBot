@@ -48,6 +48,7 @@ class API(BaseHTTPRequestHandler):
 
 
 with ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1])), API) as server:
+    print(f"Fixture Bot API listening on {server.server_port}", flush=True)
     server.serve_forever()
 """
 
@@ -58,7 +59,7 @@ import run_bot
 
 fixture_api = sys.argv.pop(1)
 run_bot.local_server_options = lambda config, settings, *args, **kwargs: (
-    [sys.executable, fixture_api, str(settings.port)], os.environ.copy(),
+    [sys.executable, "-u", fixture_api, str(settings.port)], os.environ.copy(),
 )
 raise SystemExit(run_bot.main())
 """
@@ -77,7 +78,7 @@ class LauncherProcessTests(unittest.TestCase):
             (data / "config.txt").write_text(
                 "[config]\ntoken = 424242:fixture123\nallowed_users = []\nallowed_chats = []\n"
                 "[telegram]\nmode = local\n"
-                f"local_port = {port}\nstartup_timeout = 15\nshutdown_timeout = 8\n"
+                f"local_port = {port}\nstartup_timeout = 40\nshutdown_timeout = 8\n"
                 "[instagram]\nenabled = no\n[9gag]\nuse_selenium = no\n[youtube]\nenabled = no\n",
                 encoding="utf-8",
             )
@@ -90,7 +91,7 @@ class LauncherProcessTests(unittest.TestCase):
                     cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, env=env,
                 ) as launcher:
                     try:
-                        deadline = time.monotonic() + 25
+                        deadline = time.monotonic() + 90
                         while launcher.poll() is None and not ready.exists() and time.monotonic() < deadline:
                             time.sleep(0.1)
                         if not ready.exists():

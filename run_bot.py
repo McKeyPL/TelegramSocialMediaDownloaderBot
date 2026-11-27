@@ -17,6 +17,7 @@ import time
 from pathlib import Path
 
 from media_policy import MediaPolicy
+from native_release import install_native_api
 from runtime_config import RuntimeSettings, read_config
 
 
@@ -40,6 +41,8 @@ def local_server_options(config, settings, data_dir, *, prepare=False):
         native_name = "telegram-bot-api.exe" if os.name == "nt" else "telegram-bot-api"
         bundled_binary = ROOT / "bin" / native_name
         executable = str(bundled_binary) if bundled_binary.is_file() else shutil.which("telegram-bot-api")
+        if executable is None:
+            executable = str(install_native_api(ROOT, allow_download=prepare))
     if not executable:
         raise ValueError("Use the release for this platform or set telegram.local_binary")
 

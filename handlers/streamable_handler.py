@@ -29,7 +29,7 @@ class StreamableHandler(MediaHandler):
             max_filesize = self.policy.download_limit(self.MAX_FILESIZE)
             max_duration = self.policy.duration_limit(self.MAX_DURATION_SECONDS)
             if yt_dlp_wrapper.is_within_download_limits(
-                info, max_filesize=max_filesize, max_duration=max_duration,
+                info, max_filesize=None if self.policy.local else max_filesize, max_duration=max_duration,
             ):
                 filename, info = yt_dlp_wrapper.download(
                     link, policy=self.policy, max_filesize=max_filesize, max_duration=max_duration,

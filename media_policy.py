@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 MB = 1_000_000
 PUBLIC_UPLOAD_BYTES = 50 * MB
-LOCAL_UPLOAD_BYTES = 2000 * MB
+LOCAL_UPLOAD_BYTES = 1999 * MB
 PHOTO_UPLOAD_BYTES = 10 * MB
 
 

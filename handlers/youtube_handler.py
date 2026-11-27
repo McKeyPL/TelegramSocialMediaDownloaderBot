@@ -36,7 +36,7 @@ class YouTubeHandler(MediaHandler):
             max_filesize = self.policy.download_limit(self.MAX_FILESIZE)
             max_duration = self.policy.duration_limit(self.MAX_DURATION_SECONDS)
             if not yt_dlp_wrapper.is_within_download_limits(
-                info, max_filesize=max_filesize, max_duration=max_duration,
+                info, max_filesize=None if self.policy.local else max_filesize, max_duration=max_duration,
             ):
                 return PostData(site=self.SITE_NAME, post_type="error")
 

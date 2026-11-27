@@ -24,8 +24,10 @@ NATIVE_LICENSES = {"licenses/Telegram-Bot-API.txt", "licenses/TDLib.txt", "licen
 OPTIONAL_FILES = {
     "install_local.bat",
     "start_bot.bat",
+    "start_bot.sh",
     "start_bot_local.bat",
     "scripts/install_local.py",
+    "scripts/sync_requirements.py",
     "scripts/build_bot_api_windows.ps1",
     "LICENSE",
     "README.md",

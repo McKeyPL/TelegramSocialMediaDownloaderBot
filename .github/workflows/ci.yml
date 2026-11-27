@@ -11,6 +11,8 @@ permissions:
 
 jobs:
   package:
+    permissions:
+      contents: write
     name: Test and build ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 150
@@ -118,7 +120,11 @@ jobs:
           "$binary" --version
           dependencies="$(ldd "$binary")"
           printf '%s\n' "$dependencies"
-          unexpected="$(printf '%s\n' "$dependencies" | awk '$1 !~ /^(linux-vdso\.so\.1|ld-linux-(x86-64|aarch64)\.so\.[12]|lib(c|m|dl|pthread|rt|resolv)\.so\.[26])$/ || /not found/')"
+          unexpected="$(printf '%s\n' "$dependencies" | awk '{
+            library = $1
+            sub(/^.*\//, "", library)
+            if (library !~ /^(linux-vdso\.so\.1|ld-linux-(x86-64|aarch64)\.so\.[12]|lib(c|m|dl|pthread|rt|resolv)\.so\.[26])$/ || /not found/) print
+          }')"
           if [[ -n "$unexpected" ]]; then
             printf 'Unexpected Linux runtime dependencies:\n%s\n' "$unexpected" >&2
             exit 1
@@ -182,5 +188,39 @@ jobs:
         with:
           name: telegram-social-media-downloader-bot-${{ github.sha }}-${{ matrix.platform }}
           path: dist/telegram-social-media-downloader-bot-${{ github.sha }}-${{ matrix.platform }}.zip*
+          if-no-files-found: error
+          compression-level: 0
+      - name: Publish native download for automatic setup
+        if: github.event_name == 'push' && github.ref == 'refs/heads/beta'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$PACKAGE_TARGET-beta-$GITHUB_SHA"
+          zip="dist/telegram-social-media-downloader-bot-$GITHUB_SHA-$PACKAGE_TARGET.zip"
+          if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$tag" "$zip" "$zip.sha256" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --prerelease --latest=false \
+              --title "$PACKAGE_TARGET beta ${GITHUB_SHA:0:12}" --notes "Automatic setup for $GITHUB_SHA."
+          fi
+      - name: Build and verify Docker image
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          install -D -m 0755 native-bundle/bin/telegram-bot-api bin/telegram-bot-api
+          image="telegram-social-media-downloader-bot:$GITHUB_SHA-$PACKAGE_TARGET"
+          docker build --tag "$image" --label "org.opencontainers.image.revision=$GITHUB_SHA" .
+          docker run --rm --entrypoint /app/bin/telegram-bot-api "$image" --version
+          docker run --rm "$image" --help
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/beta ]]; then
+            archive="telegram-social-media-downloader-bot-$GITHUB_SHA-docker-$PACKAGE_TARGET.tar.gz"
+            docker save "$image" | gzip -c > "dist/$archive"
+            (cd dist && sha256sum "$archive" > "$archive.sha256")
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/beta'
+        with:
+          name: telegram-social-media-downloader-bot-${{ github.sha }}-docker-${{ matrix.platform }}
+          path: dist/telegram-social-media-downloader-bot-${{ github.sha }}-docker-${{ matrix.platform }}.tar.gz*
           if-no-files-found: error
           compression-level: 0

@@ -55,9 +55,13 @@ def get_video_info(link):
         return ydl.extract_info(link, download=False)
 
 
-def is_within_download_limits(info, *, max_filesize: int, max_duration: int | None) -> bool:
+def is_within_download_limits(info, *, max_filesize: int | None, max_duration: int | None) -> bool:
     if not isinstance(info, dict):
         return False
+    if max_duration is not None and (info.get("duration") or 0) > max_duration:
+        return False
+    if max_filesize is None:
+        return True
 
     filesize = info.get("filesize") or info.get("filesize_approx")
     if not filesize:
@@ -68,9 +72,7 @@ def is_within_download_limits(info, *, max_filesize: int, max_duration: int | No
             estimates = (item.get("filesize") or item.get("filesize_approx") for item in info.get("formats") or ())
             filesize = next((estimate for estimate in estimates if estimate), 0)
 
-    return (filesize or 0) <= max_filesize and (
-        max_duration is None or (info.get("duration") or 0) <= max_duration
-    )
+    return (filesize or 0) <= max_filesize
 
 
 def clean_download(filename) -> None:
@@ -101,7 +103,9 @@ def download(
             raise DownloadError("Combined media exceeded the configured download size limit")
 
     def match_filter(info, *, incomplete=False):
-        if not incomplete and not is_within_download_limits(info, max_filesize=max_filesize, max_duration=max_duration):
+        if not incomplete and not is_within_download_limits(
+            info, max_filesize=None if policy.local else max_filesize, max_duration=max_duration,
+        ):
             return "Media exceeds the configured download size or duration limit"
         return None
 

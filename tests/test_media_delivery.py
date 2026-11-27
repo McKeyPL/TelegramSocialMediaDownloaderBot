@@ -43,16 +43,18 @@ class MediaPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "max_size_mb"):
             MediaPolicy.from_config(config)
 
-    def test_local_youtube_preflight_uses_local_download_limit(self):
+    def test_local_youtube_ignores_estimated_size_but_keeps_duration_and_download_limit(self):
         handler = YouTubeHandler(policy=MediaPolicy(local=True))
+        self.assertEqual(handler.policy.upload_limit(), 1_999_000_000)
+        self.assertEqual(handler.policy.download_limit(), 1_999_000_000)
         with (
             patch("yt_dlp_wrapper.get_video_info") as info,
             patch("yt_dlp_wrapper.download", return_value=("clip.mp4", {"id": "clip"})) as download,
         ):
-            info.return_value = {"filesize": LOCAL_UPLOAD_BYTES + 1}
+            info.return_value = {"filesize": LOCAL_UPLOAD_BYTES + 1, "duration": 1201}
             self.assertEqual(handler.handle(SOURCE).post_type, "error")
             download.assert_not_called()
-            info.return_value = {"filesize": 150_000_000, "duration": 1200}
+            info.return_value = {"filesize_approx": LOCAL_UPLOAD_BYTES + 1, "duration": 1200}
             self.assertEqual(handler.handle(SOURCE).post_type, "media")
             download.assert_called_once_with(
                 SOURCE, policy=handler.policy, max_filesize=LOCAL_UPLOAD_BYTES, max_duration=1200,
