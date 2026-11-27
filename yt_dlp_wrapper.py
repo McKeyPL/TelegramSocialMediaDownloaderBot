@@ -1,7 +1,14 @@
 from enum import Enum
+from pathlib import Path
+import shutil
+from tempfile import mkdtemp
+
 import ffmpeg
 import os
 import yt_dlp
+from yt_dlp.utils import DownloadError
+
+from media_policy import MediaLimitError, MediaPolicy
 
 
 class CompressionLevel(Enum):
@@ -16,8 +23,12 @@ ydl_options = {
               "best[height<=720][width>720]/"
               "best[width<=720]",
     "merge_output_format": "mp4",
-    "outtmpl": "temp/yt-dlp/%(webpage_url_domain)s-%(id)s.%(ext)s",
+    "noplaylist": True,
+    "hls_prefer_native": True,
+    "socket_timeout": 45,
 }
+
+DOWNLOAD_ROOT = Path("temp", "yt-dlp")
 
 
 compression_scenarios = [
@@ -40,45 +51,105 @@ compression_scenarios = [
 
 
 def get_video_info(link):
-    print(f"[DEBUG] get_video_info called with link: {link}")
     with yt_dlp.YoutubeDL(ydl_options) as ydl:
-        info_dict = ydl.extract_info(link, download=False)
-        return info_dict
+        return ydl.extract_info(link, download=False)
 
 
-def download(link, output_template=None, thumbnail_url=None):
-    print(f"[DEBUG] download called with link: {link}")
-    options = ydl_options.copy()
-    if output_template:
-        options["outtmpl"] = os.path.join("temp/yt-dlp", output_template)
+def is_within_download_limits(info, *, max_filesize: int, max_duration: int | None) -> bool:
+    if not isinstance(info, dict):
+        return False
+
+    filesize = info.get("filesize") or info.get("filesize_approx")
+    if not filesize:
+        selected = info.get("requested_formats")
+        if selected:
+            filesize = sum(item.get("filesize") or item.get("filesize_approx") or 0 for item in selected)
+        else:
+            estimates = (item.get("filesize") or item.get("filesize_approx") for item in info.get("formats") or ())
+            filesize = next((estimate for estimate in estimates if estimate), 0)
+
+    return (filesize or 0) <= max_filesize and (
+        max_duration is None or (info.get("duration") or 0) <= max_duration
+    )
+
+
+def clean_download(filename) -> None:
+    """Remove the private staging directory of one yt-dlp download."""
+    path = Path(filename).resolve()
+    root = DOWNLOAD_ROOT.resolve()
+    directory = path.parent
+    if directory.parent == root and directory.name.startswith("download-"):
+        shutil.rmtree(directory, ignore_errors=True)
+
+
+def download(
+    link, output_template=None, thumbnail_url=None, *,
+    policy: MediaPolicy | None = None, max_filesize: int | None = None, max_duration: int | None = None,
+):
+    policy = policy or MediaPolicy()
+    max_filesize = policy.download_limit() if max_filesize is None else max_filesize
+    upload_limit = policy.upload_limit()
+    DOWNLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+    directory = Path(mkdtemp(prefix="download-", dir=DOWNLOAD_ROOT)).resolve()
+
+    def check_progress(status):
+        if (status.get("downloaded_bytes") or 0) > max_filesize:
+            raise DownloadError("Media exceeded the configured download size limit")
+        # Split streams can each stay below the limit but exceed it together.
+        total = sum(path.stat().st_size for path in directory.iterdir() if path.is_file())
+        if total > max_filesize:
+            raise DownloadError("Combined media exceeded the configured download size limit")
+
+    def match_filter(info, *, incomplete=False):
+        if not incomplete and not is_within_download_limits(info, max_filesize=max_filesize, max_duration=max_duration):
+            return "Media exceeds the configured download size or duration limit"
+        return None
+
+    options = {
+        **ydl_options,
+        "outtmpl": str(directory / (output_template or "%(webpage_url_domain)s-%(id)s.%(ext)s")),
+        "max_filesize": max_filesize,
+        "progress_hooks": [check_progress],
+        "match_filter": match_filter,
+        # A stream delegated to FFmpeg can bypass yt-dlp's byte progress hooks.
+        "external_downloader_args": {"ffmpeg_o": ["-fs", str(max_filesize + 1)]},
+    }
     if thumbnail_url:
         options["writethumbnail"] = True
-        # Override yt-dlp's thumbnail with our provided one
-        options["postprocessors"] = [{
-            'key': 'FFmpegThumbnailsConvertor',
-            'format': 'jpg',
-        }]
-    
-    with yt_dlp.YoutubeDL(options) as ydl:
-        info_dict = ydl.extract_info(link, download=True)
-        vid_filename = ydl.prepare_filename(info_dict)
-        print(f"[DEBUG] Downloaded filename: {vid_filename}")
-        size = os.path.getsize(vid_filename)
-        print(f"[DEBUG] File size: {size}")
-        if info_dict['vcodec'].startswith("vp09") or size > 50 * 1000 * 1000:
-            is_vertical = info_dict['height'] > info_dict['width']
-            print(f"[DEBUG] Needs compression. is_vertical: {is_vertical}")
-            vid_filename = compress_video(vid_filename, size, is_vertical)
-            print(f"[DEBUG] Compressed filename: {vid_filename}")
-        return vid_filename, info_dict
+        options["postprocessors"] = [{"key": "FFmpegThumbnailsConvertor", "format": "jpg"}]
+
+    try:
+        with yt_dlp.YoutubeDL(options) as ydl:
+            info = ydl.extract_info(link, download=True)
+            if not info:
+                raise MediaLimitError("yt-dlp did not produce downloadable media")
+            downloads = info.get("requested_downloads") or ()
+            actual = downloads[0].get("filepath") if downloads else None
+            path = Path(actual or ydl.prepare_filename(info)).resolve()
+            if path.parent != directory:
+                raise MediaLimitError("Download did not produce a file in the staging directory")
+            size = path.stat().st_size
+            if not 0 < size <= max_filesize:
+                raise MediaLimitError("Media exceeded the configured download size limit")
+
+        # Preserve the public API's compression behavior. Local mode sends the original file.
+        if not policy.local and ((info.get("vcodec") or "").startswith("vp09") or size > upload_limit):
+            vertical = (info.get("height") or 0) > (info.get("width") or 0)
+            path = Path(compress_video(str(path), size, vertical, upload_limit=upload_limit))
+        if not 0 < path.stat().st_size <= upload_limit:
+            raise MediaLimitError("Media exceeded the configured upload size limit")
+        return str(path), info
+    except BaseException:
+        shutil.rmtree(directory, ignore_errors=True)
+        raise
 
 
-def compress_video(video_path, original_size, is_vertical=False):
+def compress_video(video_path, original_size, is_vertical=False, *, upload_limit=50 * 1000 * 1000):
     print(f"[DEBUG] compress_video called: {video_path}, size: {original_size}, is_vertical: {is_vertical}")
     for scenario in compression_scenarios:
         if original_size < scenario["size_threshold"]:
-            compressed_video_path = video_path.replace(
-                ".mp4", f"-compressed-{scenario['name']}.mp4")
+            source = Path(video_path)
+            compressed_video_path = str(source.with_name(f"{source.stem}-compressed-{scenario['name']}.mp4"))
             if not os.path.exists(compressed_video_path):
                 if scenario["resolution_resize"] == CompressionLevel.NO_RESIZE:
                     run_compression(video_path, compressed_video_path)
@@ -89,10 +160,10 @@ def compress_video(video_path, original_size, is_vertical=False):
                         video_path, compressed_video_path, scale)
             compressed_size = os.path.getsize(compressed_video_path)
             print(f"[DEBUG] Compressed file size: {compressed_size}")
-            if compressed_size < 50 * 1000 * 1000:
+            if compressed_size <= upload_limit:
                 return compressed_video_path
 
-    if original_size < 50 * 1000 * 1000:
+    if original_size <= upload_limit:
         # fallback to original video if compression fails
         print(f"[DEBUG] Compression failed, using original file.")
         return video_path

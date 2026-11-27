@@ -1,5 +1,15 @@
-logs/*.log
-temp
-venv
-__pycache__
-.git
+# Build the image from application source and the config template.
+**
+!/*.py
+!/Dockerfile
+!/requirements.txt
+!/config.default.txt
+!/handlers/
+/handlers/**
+!/handlers/*.py
+!/logs/
+/logs/**
+!/logs/.gitkeep
+!/bin/
+/bin/**
+!/bin/telegram-bot-api

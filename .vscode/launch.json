@@ -3,9 +3,10 @@
     "configurations": [
         {
             "name": "Python: Run bot (install requirements)",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/bot.py",
+            "program": "${workspaceFolder}/run_bot.py",
+            "subProcess": true,
             "console": "integratedTerminal",
             "justMyCode": true,
             "preLaunchTask": "install-requirements"

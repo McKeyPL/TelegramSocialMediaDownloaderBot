@@ -1,11 +1,12 @@
-pyTelegramBotAPI
+pyTelegramBotAPI>=4.18.0
 getuseragent
 beautifulsoup4
 tendo
 instagrapi
-selenium
+selenium>=4.54.0
 yt-dlp
 ffmpeg-python # yt-dlp additionally requires standalone ffmpeg
 # for instagrapi
 pillow
 requests>=2.31.0
+urllib3>=2
