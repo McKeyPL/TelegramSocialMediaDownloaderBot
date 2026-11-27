@@ -1,3 +1,4 @@
+import json
 from configparser import ConfigParser
 
 from media_policy import MediaPolicy
@@ -21,9 +22,26 @@ class HandlerRegistry:
     @classmethod
     def create_from_config(cls, config: ConfigParser, *, media_policy: MediaPolicy | None = None):
         policy = media_policy or MediaPolicy.from_config(config)
+        configured = config.get("sites", "enabled", fallback="").strip()
+        enabled_sites = None
+        if configured:
+            known_sites = {
+                handler.SITE_NAME for handler in (
+                    BooruHandler, InstagramHandler, NineGagHandler, TikTokHandler, TwitterHandler,
+                    DemotyHandler, YouTubeHandler, MastodonHandler, StreamableHandler, BlueskyHandler,
+                )
+            }
+            enabled_sites = json.loads(configured)
+            if not isinstance(enabled_sites, list) or any(
+                not isinstance(site, str) or site not in known_sites for site in enabled_sites
+            ):
+                raise ValueError("[sites] enabled must be a JSON list of known site names.")
+
         handlers = [
             BooruHandler(),
-            InstagramHandler.create_from_config(config['instagram']),
+            InstagramHandler.create_from_config(config['instagram'])
+            if enabled_sites is None or InstagramHandler.SITE_NAME in enabled_sites
+            else InstagramHandler(None, enabled=False),
             NineGagHandler(
                 use_selenium=config['9gag'].getboolean('use_selenium')),
             TikTokHandler(),
@@ -39,6 +57,10 @@ class HandlerRegistry:
                 policy=policy,
             ),
         ]
+        if enabled_sites is not None:
+            for handler in handlers:
+                if handler.SITE_NAME not in enabled_sites:
+                    handler.enabled = False
         return cls(handlers)
 
     def get_all_handlers(self) -> list[MediaHandler]:

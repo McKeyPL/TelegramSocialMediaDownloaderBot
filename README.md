@@ -18,6 +18,15 @@ Before starting, copy `config.default.txt` into the data directory as `config.tx
 
 Run `start_bot.bat` on Windows or `sh ./start_bot.sh` on Linux and macOS. The launcher creates a venv if needed and installs Python dependencies on the first run or when `requirements.txt` changes. After updating the checkout, keep your existing `config.txt`. Local mode uses an available native binary or downloads the matching OS and architecture package for the exact checked-out commit from GitHub Releases. It verifies the package and binary checksums and caches the executable. No GitHub login is required for these public releases. Use a tagged version after its platform job publishes the matching release. Ordinary `beta` commits run tests and have no new downloadable package. Python and FFmpeg remain host prerequisites.
 
+The dependency installer repairs an existing venv if pip is missing. On Windows, each start also checks for updates to `yt-dlp`, its EJS components and Deno. The launcher checks the official Deno archive checksum and keeps the executable under `tools/media`.
+
+To split sites between bots sharing a chat, set an optional allowlist in `config.txt`. Per-site switches such as `[instagram] enabled = False` still apply. Excluding `booru` also disables its `>>` shortcuts.
+
+```ini
+[sites]
+enabled = ["9gag", "youtube", "streamable", "bluesky"]
+```
+
 | Mode | Processes and uploads |
 | --- | --- |
 | `public` (default, including when `[telegram]` is absent) | The launcher runs the bot against Telegram's public API. The default video and animation upload cap is 50 MB. |
@@ -29,18 +38,13 @@ Local mode also needs `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` from your Telegr
 
 ## Run with Docker
 
-A version-tag build publishes separate images to GitHub Container Registry. Tag `v1.0.0` produces `ghcr.io/mckeypl/telegramsocialmediadownloaderbot:v1.0.0-linux-x64` and `ghcr.io/mckeypl/telegramsocialmediadownloaderbot:v1.0.0-linux-arm64`. After the first publish, set the package visibility to **Public** in GitHub Packages if the image should pull without signing in. For Portainer on Docker Standalone, upload [compose.yaml](compose.yaml). Set `BOT_IMAGE` to override the image tag or architecture and `BOT_DATA_DIR` to the path of the host directory with `config.txt`. The default host directory is `/srv/telegram-bot`.
+A version-tag build publishes separate images to GitHub Container Registry. Tag `v1.0.1` produces `ghcr.io/mckeypl/telegramsocialmediadownloaderbot:v1.0.1-linux-x64` and `ghcr.io/mckeypl/telegramsocialmediadownloaderbot:v1.0.1-linux-arm64`. After the first publish, set the package visibility to **Public** in GitHub Packages if the image should pull without signing in. Set `BOT_IMAGE` to override the image tag or architecture.
 
-For an offline import, download the matching Docker artifact from the version's GitHub Actions run. Extract it, verify the included SHA-256, then import the image. Use the image name and tag printed by `docker load`.
+For Portainer on Docker Standalone, add a stack using the [compose.yaml](compose.yaml) template. Replace the indented text under `configs.bot_config.content` with your `config.txt`. Escape literal dollar signs as `$$`. Compose mounts the result as `/data/config.txt` and the named `bot_data` volume preserves sessions and Bot API state. Keep the same stack name and volume when updating the image. Local mode binds Bot API to loopback inside the container. [Compose configuration reference](https://docs.docker.com/reference/compose-file/configs/)
 
-```powershell
-docker load -i .\image-linux-x64.tar.gz
-docker run -d --name telegram-downloader --restart unless-stopped `
-  --mount "type=bind,source=D:\TelegramBotData,target=/data" `
-  IMAGE_NAME:TAG
-```
+**Use inline configuration only in a trusted environment.** The completed Compose file and the Portainer stack definition contain the bot token, API hash and any other configured credentials in plain text. Keep the completed file out of Git and restrict access to the stack. Inline `content` requires Docker Compose 2.23.1 or later.
 
-Create `D:\TelegramBotData` and place `config.txt` inside it before starting. On Linux, use a host path such as `/srv/telegram-bot` as the mount source. The mounted directory preserves configuration, sessions and Bot API state across container replacements. For an update, stop and remove the old container and start the new image with the same mount. Local mode uses the bundled Bot API on loopback without publishing an API port to the host.
+For an offline import, download the matching Docker artifact from the version's GitHub Actions run, extract it and verify the included SHA-256. Run `docker load -i <archive.tar.gz>` on the Docker host and set `BOT_IMAGE` to the image name and tag printed by Docker.
 
 ## Build a Windows package locally
 

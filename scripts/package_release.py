@@ -28,6 +28,7 @@ OPTIONAL_FILES = {
     "start_bot_local.bat",
     "scripts/install_local.py",
     "scripts/sync_requirements.py",
+    "scripts/update_media_tools.py",
     "scripts/build_bot_api_windows.ps1",
     "LICENSE",
     "README.md",

@@ -10,6 +10,12 @@ allowed_chats = [-10002137, -100042069]
 # your tg username, used in the msg to unauthorized users
 owner_username = @example
 
+[sites]
+# Optional JSON list for bots that should handle only selected sites.
+# Names: 9gag, twitter, instagram, booru, demoty, tiktok, youtube, mastodon, streamable, bluesky.
+# Blank preserves the per-site enabled settings below. [] disables all site handlers.
+enabled =
+
 [telegram]
 # public uses api.telegram.org. local starts a dedicated telegram-bot-api server.
 mode = public

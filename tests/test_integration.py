@@ -136,6 +136,24 @@ class IntegrationTests(unittest.TestCase):
                 self.assertIsNotNone(re.match(registry.get_handler(site).URL_REGEX, url))
         self.assertIsNotNone(re.match(registry.get_handler("mastodon").URL_REGEX, MISSKEY_URL))
 
+    def test_site_allowlist_excludes_instagram_and_booru_shortcuts(self):
+        self.config["sites"]["enabled"] = '["9gag", "youtube", "streamable", "bluesky"]'
+        self.config["bluesky"]["enabled"] = "yes"
+        with patch("handlers.instagram_handler.Client") as instagram:
+            self.start_offline_bot()
+        instagram.assert_not_called()
+        patterns = [options["regexp"] for options, _ in self.routes if "regexp" in options]
+        for url in ("https://9gag.com/gag/example", YOUTUBE_URL, STREAMABLE_URL, BLUESKY_URL):
+            self.assertTrue(any(pattern != "http" and re.search(pattern, url) for pattern in patterns))
+        for url in ("https://x.com/user/status/1", "https://instagram.com/p/example",
+                    "https://derpibooru.org/123", ">>?123", MASTODON_URL, MISSKEY_URL):
+            self.assertFalse(any(pattern != "http" and re.search(pattern, url) for pattern in patterns))
+
+    def test_site_allowlist_rejects_unknown_names(self):
+        self.config["sites"]["enabled"] = '["unknown"]'
+        with self.assertRaisesRegex(ValueError, "known site names"):
+            HandlerRegistry.create_from_config(self.config)
+
     def test_photo_sends_to_original_chat_and_replies_to_message(self):
         message = SimpleNamespace(chat=SimpleNamespace(id=8), message_id=10, id=10)
         self.sender.send(message, PostData(

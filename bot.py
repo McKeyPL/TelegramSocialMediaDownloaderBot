@@ -127,7 +127,8 @@ def main() -> None:
         post_orchestrator,
     )
     routes.register_handlers()
-    routes.register_special_derpibooru_handler(booru_handler, post_data_sender)
+    if booru_handler.enabled:
+        routes.register_special_derpibooru_handler(booru_handler, post_data_sender)
 
     ready_marker = os.environ.get("TSMD_BOT_READY_FILE")
     if ready_marker:

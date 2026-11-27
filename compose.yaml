@@ -1,13 +1,41 @@
 services:
   telegram-downloader:
-    image: "${BOT_IMAGE:-ghcr.io/mckeypl/telegramsocialmediadownloaderbot:v1.0.0-linux-x64}"
+    image: "${BOT_IMAGE:-ghcr.io/mckeypl/telegramsocialmediadownloaderbot:v1.0.1-linux-x64}"
     pull_policy: missing
     init: true
     restart: unless-stopped
     stop_grace_period: 75s
     volumes:
-      - type: bind
-        source: "${BOT_DATA_DIR:-/srv/telegram-bot}"
-        target: /data
-        bind:
-          create_host_path: false
+      - bot_data:/data
+    configs:
+      - source: bot_config
+        target: /data/config.txt
+
+volumes:
+  bot_data:
+
+configs:
+  bot_config:
+    content: |
+      [config]
+      token = YOUR_BOT_TOKEN
+      allowed_users = [123456789]
+      allowed_chats = []
+      owner_username = @example
+
+      [telegram]
+      mode = local
+      api_id = YOUR_API_ID
+      api_hash = YOUR_API_HASH
+
+      [instagram]
+      enabled = False
+
+      [9gag]
+      use_selenium = False
+
+      [youtube]
+      enabled = True
+
+      [streamable]
+      enabled = True
