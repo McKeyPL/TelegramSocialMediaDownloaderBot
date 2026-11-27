@@ -45,3 +45,11 @@ Historia robocza, w tym merge z upstreamem, zostaje na lokalnej gałęzi integra
 4. **Ręcznie uruchamiane wdrożenie na Windowsie.** Najpierw ustalić, jak uruchamiana jest obecna instancja. Następnie przygotować wdrożenie konkretnej paczki z zachowaniem konfiguracji i danych, kontrolowanym restartem, sprawdzeniem działania i powrotem do poprzedniej wersji w przypadku błędu. Przećwiczyć wdrożenie i powrót na instancji testowej przed użyciem na produkcji.
 
 Etap jest gotowy, gdy ten sam zestaw testów przechodzi lokalnie i w CI, paczkę można powiązać z konkretnym commitem, a próbne wdrożenie i powrót do poprzedniej wersji działają na Windowsie.
+
+## Wydanie i przeniesienie na serwer
+
+1. Poczekać na testy `beta`, a przed scaleniem sprawdzić różnice względem własnego `master`. Po zaakceptowaniu zmian scalić `beta` do `master` i oznaczyć zweryfikowany commit tagiem wersji `v*`. Zwykłe pushe i PR-y do obu gałęzi uruchamiają testy. Tag uruchamia testy przed kompilacją i publikacją paczek oraz artefaktów Dockera.
+2. Przygotować dedyka z paczką odpowiednią dla systemu i architektury. Zachować konfigurację i potrzebne sesje w osobnym katalogu, przenosząc je prywatnym kanałem. Zweryfikować start na osobnym tokenie testowym, jeśli taki jest dostępny.
+3. Ustalić sposób zatrzymania starej instancji oraz jej tryb API. Przy przenoszeniu tego samego tokena zatrzymać dotychczasowy polling przed startem nowego. Zmianę trybu API lub hosta lokalnego API wykonać według procedury migracji. Potwierdzić polling oraz wysłanie pojedynczego pliku i albumu. W trybie lokalnym sprawdzić także plik większy niż 50 MB. Zachować poprzednią wersję i kopię danych do powrotu. [Instrukcje migracji serwera Bot API](https://github.com/tdlib/telegram-bot-api#moving-a-bot-from-one-local-server-to-another)
+
+Dalszy rozwój prowadzimy w forku, przenosząc wybrane aktualizacje z upstreamu lub przepisując konkretne funkcje. Pełna synchronizacja upstreamu może być osobną decyzją dla przyszłego wydania.

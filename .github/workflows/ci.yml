@@ -2,9 +2,10 @@ name: CI and release package
 
 on:
   pull_request:
-    branches: [beta]
+    branches: [beta, master]
   push:
-    branches: [beta]
+    branches: [beta, master]
+    tags: ['v*']
 
 permissions:
   contents: read
@@ -13,7 +14,7 @@ jobs:
   package:
     permissions:
       contents: write
-    name: Test and build ${{ matrix.platform }}
+    name: ${{ github.ref_type == 'tag' && 'Test and build' || 'Test' }} ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 150
     strategy:
@@ -51,7 +52,12 @@ jobs:
           python -c "import bs4, ffmpeg, getuseragent, instagrapi, PIL, requests, selenium, telebot, tendo, urllib3, yt_dlp; import bot, run_bot"
       - name: Run offline tests
         run: python -m unittest discover -s tests -v
+      - name: Record the release commit
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: echo "APP_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
       - name: Check out the official Telegram Bot API source
+        if: github.ref_type == 'tag'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: tdlib/telegram-bot-api
@@ -60,11 +66,11 @@ jobs:
           submodules: recursive
           persist-credentials: false
       - name: Build and verify Bot API on Windows
-        if: runner.os == 'Windows'
+        if: github.ref_type == 'tag' && runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/build_bot_api_windows.ps1 -BotApiCommit $env:BOT_API_COMMIT -BuildOnly
       - name: Configure Bot API on Linux
-        if: runner.os == 'Linux'
+        if: github.ref_type == 'tag' && runner.os == 'Linux'
         shell: bash
         run: |
           sudo apt-get update
@@ -74,7 +80,7 @@ jobs:
             -DOPENSSL_USE_STATIC_LIBS=TRUE -DZLIB_USE_STATIC_LIBS=ON \
             '-DCMAKE_EXE_LINKER_FLAGS=-static-libstdc++ -static-libgcc'
       - name: Configure Bot API on macOS
-        if: runner.os == 'macOS'
+        if: github.ref_type == 'tag' && runner.os == 'macOS'
         shell: bash
         env:
           MACOSX_DEPLOYMENT_TARGET: "13.0"
@@ -103,7 +109,7 @@ jobs:
             -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOSX_DEPLOYMENT_TARGET" \
             -DOPENSSL_ROOT_DIR="$prefix" -DOPENSSL_USE_STATIC_LIBS=TRUE
       - name: Build and stage the native server
-        if: runner.os != 'Windows'
+        if: github.ref_type == 'tag' && runner.os != 'Windows'
         shell: bash
         run: |
           test "$(git -C .native-source rev-parse HEAD)" = "$BOT_API_COMMIT"
@@ -113,7 +119,7 @@ jobs:
           cp .native-source/LICENSE_1_0.txt native-bundle/licenses/Telegram-Bot-API.txt
           cp .native-source/td/LICENSE_1_0.txt native-bundle/licenses/TDLib.txt
       - name: Verify Linux executable and dependencies
-        if: runner.os == 'Linux'
+        if: github.ref_type == 'tag' && runner.os == 'Linux'
         shell: bash
         run: |
           binary=native-bundle/bin/telegram-bot-api
@@ -133,7 +139,7 @@ jobs:
           cp /usr/share/doc/zlib1g-dev/copyright native-bundle/licenses/zlib.txt
           cat /usr/share/doc/libgcc-s1/copyright /usr/share/doc/libstdc++6/copyright > native-bundle/licenses/GCC.txt
       - name: Verify macOS executable and dependencies
-        if: runner.os == 'macOS'
+        if: github.ref_type == 'tag' && runner.os == 'macOS'
         shell: bash
         run: |
           binary=native-bundle/bin/telegram-bot-api
@@ -146,6 +152,7 @@ jobs:
             exit 1
           fi
       - name: Start bundled Bot API on loopback
+        if: github.ref_type == 'tag'
         shell: bash
         run: |
           python - <<'PY'
@@ -177,50 +184,48 @@ jobs:
                           process.wait()
           PY
       - name: Package exact commit and record its checksum
-        if: github.event_name == 'push' && github.ref == 'refs/heads/beta'
+        if: github.ref_type == 'tag'
         shell: bash
         run: |
-          python scripts/package_release.py --ref "$GITHUB_SHA" --output-dir dist \
+          python scripts/package_release.py --ref "$APP_COMMIT" --output-dir dist \
             --native-dir native-bundle --native-target "$PACKAGE_TARGET" --bot-api-commit "$BOT_API_COMMIT"
           cat dist/*.zip.sha256 >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: github.event_name == 'push' && github.ref == 'refs/heads/beta'
+        if: github.ref_type == 'tag'
         with:
-          name: telegram-social-media-downloader-bot-${{ github.sha }}-${{ matrix.platform }}
-          path: dist/telegram-social-media-downloader-bot-${{ github.sha }}-${{ matrix.platform }}.zip*
+          name: telegram-social-media-downloader-bot-${{ env.APP_COMMIT }}-${{ matrix.platform }}
+          path: dist/telegram-social-media-downloader-bot-${{ env.APP_COMMIT }}-${{ matrix.platform }}.zip*
           if-no-files-found: error
           compression-level: 0
       - name: Publish native download for automatic setup
-        if: github.event_name == 'push' && github.ref == 'refs/heads/beta'
+        if: github.ref_type == 'tag'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="$PACKAGE_TARGET-beta-$GITHUB_SHA"
-          zip="dist/telegram-social-media-downloader-bot-$GITHUB_SHA-$PACKAGE_TARGET.zip"
+          tag="$PACKAGE_TARGET-beta-$APP_COMMIT"
+          zip="dist/telegram-social-media-downloader-bot-$APP_COMMIT-$PACKAGE_TARGET.zip"
           if ! gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$tag" "$zip" "$zip.sha256" --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" --prerelease --latest=false \
-              --title "$PACKAGE_TARGET beta ${GITHUB_SHA:0:12}" --notes "Automatic setup for $GITHUB_SHA."
+              --target "$APP_COMMIT" --prerelease --latest=false \
+              --title "$GITHUB_REF_NAME ($PACKAGE_TARGET)" --notes "Automatic setup for $GITHUB_REF_NAME at $APP_COMMIT."
           fi
       - name: Build and verify Docker image
-        if: runner.os == 'Linux'
+        if: github.ref_type == 'tag' && runner.os == 'Linux'
         shell: bash
         run: |
           install -D -m 0755 native-bundle/bin/telegram-bot-api bin/telegram-bot-api
-          image="telegram-social-media-downloader-bot:$GITHUB_SHA-$PACKAGE_TARGET"
-          docker build --tag "$image" --label "org.opencontainers.image.revision=$GITHUB_SHA" .
+          image="telegram-social-media-downloader-bot:$APP_COMMIT-$PACKAGE_TARGET"
+          docker build --tag "$image" --label "org.opencontainers.image.revision=$APP_COMMIT" .
           docker run --rm --entrypoint /app/bin/telegram-bot-api "$image" --version
           docker run --rm "$image" --help
-          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/beta ]]; then
-            archive="telegram-social-media-downloader-bot-$GITHUB_SHA-docker-$PACKAGE_TARGET.tar.gz"
-            docker save "$image" | gzip -c > "dist/$archive"
-            (cd dist && sha256sum "$archive" > "$archive.sha256")
-          fi
+          archive="telegram-social-media-downloader-bot-$APP_COMMIT-docker-$PACKAGE_TARGET.tar.gz"
+          docker save "$image" | gzip -c > "dist/$archive"
+          (cd dist && sha256sum "$archive" > "$archive.sha256")
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/beta'
+        if: github.ref_type == 'tag' && runner.os == 'Linux'
         with:
-          name: telegram-social-media-downloader-bot-${{ github.sha }}-docker-${{ matrix.platform }}
-          path: dist/telegram-social-media-downloader-bot-${{ github.sha }}-docker-${{ matrix.platform }}.tar.gz*
+          name: telegram-social-media-downloader-bot-${{ env.APP_COMMIT }}-docker-${{ matrix.platform }}
+          path: dist/telegram-social-media-downloader-bot-${{ env.APP_COMMIT }}-docker-${{ matrix.platform }}.tar.gz*
           if-no-files-found: error
           compression-level: 0

@@ -16,7 +16,7 @@ python run_bot.py --data-dir /path/to/bot-data
 
 Before starting, copy `config.default.txt` into the data directory as `config.txt`, fill in the bot token and set the user or chat allowlists. Run without `--data-dir` to use the release directory itself. The config, Instagram session, temporary media and local API state stay in the data directory. `Ctrl+C` asks the launcher to shut down.
 
-Run `start_bot.bat` on Windows or `sh ./start_bot.sh` on Linux and macOS. The launcher creates a venv if needed and installs Python dependencies on the first run or when `requirements.txt` changes. After updating the checkout, keep your existing `config.txt`. Local mode uses an available native binary or downloads the matching OS and architecture package for the exact checked-out commit from GitHub Releases. It verifies the package and binary checksums and caches the executable. No GitHub login is required for these public releases. Wait for the matching `beta` job to publish its release. Python and FFmpeg remain host prerequisites.
+Run `start_bot.bat` on Windows or `sh ./start_bot.sh` on Linux and macOS. The launcher creates a venv if needed and installs Python dependencies on the first run or when `requirements.txt` changes. After updating the checkout, keep your existing `config.txt`. Local mode uses an available native binary or downloads the matching OS and architecture package for the exact checked-out commit from GitHub Releases. It verifies the package and binary checksums and caches the executable. No GitHub login is required for these public releases. Use a tagged version after its platform job publishes the matching release. Ordinary `beta` commits run tests and have no new downloadable package. Python and FFmpeg remain host prerequisites.
 
 | Mode | Processes and uploads |
 | --- | --- |
@@ -27,11 +27,20 @@ Both modes cap photo uploads at 10 MB. Telegram may apply additional restriction
 
 Local mode also needs `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` from your Telegram application, or the corresponding settings in the runtime `config.txt`. The launcher finds the bundled executable automatically. For development from a source checkout, point `local_binary` at a compatible native build or put it on PATH. Keep both processes on the same filesystem so the built-in local upload path works. [Telegram application credentials](https://core.telegram.org/api/obtaining_api_id) · [Native build instructions for Windows, Linux and macOS](https://tdlib.github.io/telegram-bot-api/build.html)
 
-GitHub Actions builds Docker images for Linux x64 and arm64 using the same native API executable as the corresponding release package. The `docker-linux-*` artifacts on `beta` contain `docker save` archives and hashes. Verify the hash, then import the archive with `docker load -i <archive.tar.gz>`. Run the image with a persistent directory mounted at `/data`, containing `config.txt`. Local mode runs inside the same container, with its API bound to loopback. For a manual Docker build, build from the extracted Linux release to include its native executable.
+## Run with Docker
 
-## Move an existing bot between modes
+Download the matching Linux x64 or ARM64 Docker artifact from the version's GitHub Actions run. Extract it, verify the included SHA-256, then import the image. Use the image name and tag printed by `docker load`.
 
-### Build a Windows package locally
+```powershell
+docker load -i .\image-linux-x64.tar.gz
+docker run -d --name telegram-downloader --restart unless-stopped `
+  --mount "type=bind,source=D:\TelegramBotData,target=/data" `
+  IMAGE_NAME:TAG
+```
+
+Create `D:\TelegramBotData` and place `config.txt` inside it before starting. On Linux, use a host path such as `/srv/telegram-bot` as the mount source. The mounted directory preserves configuration, sessions and Bot API state across container replacements. For an update, stop and remove the old container and start the new image with the same mount. Local mode uses the bundled Bot API on loopback without publishing an API port to the host.
+
+## Build a Windows package locally
 
 Install Git, Python 3.10 and Visual Studio 2022 Build Tools with **Desktop development with C++**, the Windows SDK and **C++ CMake tools for Windows**. Run the following from a Git checkout. The script fetches the pinned Bot API source and vcpkg dependencies, builds and checks the native binary, and writes a release ZIP plus its SHA-256 to `dist`. The ZIP uses the committed source at `HEAD`. The Windows GitHub Actions runner calls the same script.
 
@@ -42,6 +51,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build_bot_api_wind
 
 The installer uses a separate configuration under `local-data\config.txt`. Start it with `start_bot_local.bat` after completing the mode migration below.
 
+## Move an existing bot between modes
+
 1. Stop the current bot and keep its runtime data. Check that no instance with the same token is polling.
 2. With the **current** mode in `config.txt`, run `python run_bot.py --data-dir /path/to/bot-data --log-out`. In local mode this starts only the bundled API for the logout and shuts it down afterwards.
 3. Set the destination mode, run `--check`, then start the bot. Verify that it receives updates and sends media using a test chat.
@@ -50,7 +61,7 @@ Telegram enforces a 10-minute window after logging out from public Bot API durin
 
 ## Validation and Windows deployment
 
-Run the offline checks with `python -m pip check` and `python -m unittest discover -s tests -v`. The hosted test matrix uses Python 3.10 on Windows, Linux and macOS. CI builds the native server from a pinned official source revision. Each platform tests and builds independently. After its own job passes on `beta`, that platform's GitHub Actions artifact contains a release ZIP and its `.zip.sha256` file. The manifest inside the release ZIP records the app and native server revisions and the file checksums.
+Run the offline checks with `python -m pip check` and `python -m unittest discover -s tests -v`. Pushes and PRs to `beta` or `master` run those checks in the platform matrix. To publish a version, tag its tested commit and push the tag, for example `git tag v1.2.0` followed by `git push origin v1.2.0`. In the tag run, each platform runs its tests before compiling the pinned Bot API, verifying it and publishing that platform's package. Linux x64 and ARM64 also produce Docker image artifacts. A failed platform does not prevent the others from publishing. The release ZIP manifest records the app and native server revisions and file checksums.
 
 On Windows, choose a new managed root and place its config in `<root>\data\config.txt`. Make sure FFmpeg and any optional browser dependencies are available to the account running the bot. For an existing unmanaged installation, first identify its service or scheduled task and stop it separately before cutover. The deployment command manages only processes it starts.
 
