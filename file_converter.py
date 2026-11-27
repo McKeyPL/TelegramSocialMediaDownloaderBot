@@ -1,4 +1,5 @@
 import os
+import subprocess
 import time
 import traceback
 
@@ -12,10 +13,10 @@ def convert_webm_to_mp4(webm_filename):
                 # TODO: try using ffmpeg-python
                 # TODO: add reencoding to x264 for broader compatibility
                 # (for now some devices don't show video msgs properly)
-                exit_code = os.system("ffmpeg -i " + webm_filename +
-                                      " -c copy -y " + temp_filename)
-                if (exit_code != 0):
-                    raise Exception("ffmpeg returned non-zero exit code")
+                subprocess.run(
+                    ["ffmpeg", "-i", webm_filename, "-c", "copy", "-y", temp_filename],
+                    check=True,
+                )
 
                 if (os.path.isfile(final_filename)):
                     final_filename = webm_filename + str(time.time()) + ".mp4"

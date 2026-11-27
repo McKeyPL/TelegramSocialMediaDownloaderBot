@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Run bot (install requirements)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/run_bot.py",
+            "subProcess": true,
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "preLaunchTask": "install-requirements"
+        }
+    ]
+}

@@ -20,6 +20,11 @@ parts/
 sdist/
 var/
 wheels/
+tools/
+/bin/
+/.native-source/
+/.native-build/
+/native-bundle/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
@@ -161,5 +166,7 @@ cython_debug/
 
 # custom
 config.txt
+ig_session.json
+telegram-bot-api-data/
 temp/
 .vs/

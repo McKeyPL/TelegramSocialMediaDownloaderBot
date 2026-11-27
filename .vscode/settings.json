@@ -1,0 +1,6 @@
+{
+    // Use the workspace .venv interpreter by default
+    "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+    // Don't prompt to create a venv since our script handles it
+    "python.terminal.activateEnvironment": true
+}

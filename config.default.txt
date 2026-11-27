@@ -2,18 +2,46 @@
 # telegram bot token created via @BotFather
 token = <your-tg-bot-token>
 # telegram user id for every user that is allowed to use the bot
-allowed_users = [420, 2137, 621]
+# Use the special value ALL to allow the bot to be used by any Telegram user
+allowed_users = ALL
+# allowed_users = [420, 2137, 621]
 # telegram group id for every group that is allowed to use the bot (all users)
 allowed_chats = [-10002137, -100042069]
 # your tg username, used in the msg to unauthorized users
 owner_username = @example
 
+[telegram]
+# public uses api.telegram.org. local starts a dedicated telegram-bot-api server.
+mode = public
+# Optional absolute path or path relative to the runtime directory. Blank uses PATH.
+local_binary =
+local_port = 8081
+local_data_dir = telegram-bot-api-data
+# Prefer TELEGRAM_API_ID and TELEGRAM_API_HASH in the launcher environment.
+api_id =
+api_hash =
+startup_timeout = 60
+shutdown_timeout = 45
+# Optional limit in decimal MB, capped by the selected Bot API and method.
+max_upload_mb =
+# Optional Telegram upload timeout in seconds. Defaults to 120 (public) or 900 (local).
+upload_timeout =
+
+[downloads]
+# Optional size in decimal MB and video duration in minutes.
+max_size_mb =
+max_duration_minutes =
+
 [instagram]
+# set to False to completely disable instagram support, useful when restarting bot many times so ig wont ban the ip
+enabled = True
 # credentials for instagrapi (ig api), it is advised to create a throw away account for this as it may get banned
 # change do_login to true if you want to log in
 do_login = False
 username = example
 password = example
+# Optional user agent string passed to instagrapi. Leave blank for the client default.
+user_agent =
 
 [9gag]
 # Selenium seems to be required for 9gag scrapping to work, however as it is resource intensive some may want to disable it.
@@ -23,3 +51,15 @@ use_selenium = True
 [youtube]
 # yt-dlp espesially with ffmpeg reencoding is very resource intensive so there is an option to disable yt support at all
 enabled = True
+
+[streamable]
+# Enable or disable Streamable support (True/False)
+enabled = True
+
+[bluesky]
+# Credentials for Bluesky API (bsky.app)
+# Generate an App Password in your Bluesky settings under "App Passwords"
+# change enabled to true after setting up credentials
+enabled = False
+username = username.bsky.social
+app_password =
