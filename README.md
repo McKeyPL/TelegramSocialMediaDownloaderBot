@@ -48,7 +48,7 @@ Telegram enforces a 10-minute window after logging out from public Bot API durin
 
 ## Validation and Windows deployment
 
-Run the offline checks with `python -m pip check` and `python -m unittest discover -s tests -v`. The hosted test matrix uses Python 3.10 on Windows, Linux and macOS. CI builds the native server from a pinned official source revision. After CI passes on `beta`, each platform's GitHub Actions artifact contains a release ZIP and its `.zip.sha256` file. The manifest inside the release ZIP records the app and native server revisions and the file checksums.
+Run the offline checks with `python -m pip check` and `python -m unittest discover -s tests -v`. The hosted test matrix uses Python 3.10 on Windows, Linux and macOS. CI builds the native server from a pinned official source revision. Each platform tests and builds independently. After its own job passes on `beta`, that platform's GitHub Actions artifact contains a release ZIP and its `.zip.sha256` file. The manifest inside the release ZIP records the app and native server revisions and the file checksums.
 
 On Windows, choose a new managed root and place its config in `<root>\data\config.txt`. Make sure FFmpeg and any optional browser dependencies are available to the account running the bot. For an existing unmanaged installation, first identify its service or scheduled task and stop it separately before cutover. The deployment command manages only processes it starts.
 

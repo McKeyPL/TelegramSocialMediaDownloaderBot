@@ -10,35 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Python 3.10 on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version: "3.10"
-      - name: Install and validate dependencies
-        run: |
-          python -m pip install -r requirements.txt
-          python -m pip check
-      - name: Compile sources and check imports
-        run: |
-          python -m compileall -q .
-          python -c "import bs4, ffmpeg, getuseragent, instagrapi, PIL, requests, selenium, telebot, tendo, urllib3, yt_dlp; import bot, run_bot"
-      - name: Run offline tests
-        run: python -m unittest discover -s tests -v
-
   package:
-    name: Verify native server for ${{ matrix.platform }}
-    needs: test
+    name: Test and build ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 150
     strategy:
@@ -66,6 +39,16 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.10"
+      - name: Install and validate dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip check
+      - name: Compile sources and check imports
+        run: |
+          python -m compileall -q .
+          python -c "import bs4, ffmpeg, getuseragent, instagrapi, PIL, requests, selenium, telebot, tendo, urllib3, yt_dlp; import bot, run_bot"
+      - name: Run offline tests
+        run: python -m unittest discover -s tests -v
       - name: Check out the official Telegram Bot API source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
