@@ -21,12 +21,14 @@ try {
     $git = (Get-Command git -ErrorAction Stop).Source
     $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
     if (-not (Test-Path -LiteralPath $vswhere)) {
-        throw 'Install Visual Studio 2022 Build Tools with the Desktop development with C++ workload, then rerun.'
+        throw 'Install Visual Studio 2022 or 2026 Build Tools with the Desktop development with C++ workload, then rerun.'
     }
-    $vsArgs = @('-version', '[17.0,18.0)', '-latest', '-products', '*',
+    $vsArgs = @('-version', '[17.0,19.0)', '-latest', '-products', '*',
         '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64')
     $vs = & $vswhere @vsArgs -property installationPath | Select-Object -First 1
-    if (-not $vs) { throw 'Visual Studio 2022 MSVC x64 build tools were not found.' }
+    if (-not $vs) { throw 'Visual Studio 2022 or 2026 with MSVC x64 build tools was not found.' }
+    $version = [version](& $vswhere @vsArgs -property installationVersion | Select-Object -First 1)
+    $generator = if ($version.Major -eq 18) { 'Visual Studio 18 2026' } else { 'Visual Studio 17 2022' }
     $dumpbin = & $vswhere @vsArgs -find 'VC\Tools\MSVC\**\bin\Hostx64\x64\dumpbin.exe' | Select-Object -First 1
     $cmake = (Get-Command cmake -ErrorAction SilentlyContinue).Source
     if (-not $cmake) {
@@ -35,6 +37,11 @@ try {
     if (-not (Test-Path -LiteralPath $cmake) -or -not $dumpbin) {
         throw 'Install the Visual Studio CMake tools and MSVC x64 tools, then rerun.'
     }
+    $generators = & $cmake --help | Out-String
+    if ($generators -notmatch [regex]::Escape($generator)) {
+        throw "CMake does not support '$generator'. Visual Studio 2026 requires CMake 4.2 or later."
+    }
+    Write-Host "Using Visual Studio $version with CMake generator '$generator'."
 
     if (-not $VcpkgRoot) {
         $VcpkgRoot = Join-Path $repo 'tools\vcpkg'
@@ -67,9 +74,9 @@ try {
     Invoke-Checked $git @('-C', $source, 'submodule', 'update', '--init', '--recursive', '--depth', '1')
 
     Invoke-Checked $vcpkg @('install', 'gperf:x64-windows', 'openssl:x64-windows-static', 'zlib:x64-windows-static')
-    $build = Join-Path $repo '.native-build'
+    $build = Join-Path $repo ".native-build\vs$($version.Major)"
     $bundle = Join-Path $repo 'native-bundle'
-    Invoke-Checked $cmake @('-S', $source, '-B', $build, '-G', 'Visual Studio 17 2022', '-A', 'x64',
+    Invoke-Checked $cmake @('-S', $source, '-B', $build, '-G', $generator, '-A', 'x64',
         "-DCMAKE_GENERATOR_INSTANCE=$vs", "-DCMAKE_TOOLCHAIN_FILE=$VcpkgRoot/scripts/buildsystems/vcpkg.cmake",
         "-DGPERF_EXECUTABLE=$VcpkgRoot/installed/x64-windows/tools/gperf/gperf.exe",
         '-DVCPKG_TARGET_TRIPLET=x64-windows-static', '-DBUILD_TESTING=OFF', '-DCMAKE_POLICY_DEFAULT_CMP0091=NEW',
